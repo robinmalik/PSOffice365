@@ -8,9 +8,9 @@ function Copy-UserLicense
 			This function will copy all Office 365 Licenses (respecting disabled service plans) from one user, to one or more others.
 
 			More specifically it will:
-				- Replicate SKUs and Service Plans where the target user does not possess those SKUs already.
-				- Overwrite Service Plan configuration within a SKU, where the target user already has that SKU.
-				- Ignores SKUs that the target user possesses but the source user does not (i.e. it does not remove SKUs).
+			- Replicate SKUs and Service Plans where the target user does not possess those SKUs already.
+			- Overwrite Service Plan configuration within a SKU, where the target user already has that SKU.
+			- Ignores SKUs that the target user possesses but the source user does not (i.e. it does not remove SKUs).
 		.PARAMETER UserToLicense
 			Can be an array, or string. The userprincipalname names of the accounts you wish to edit licenses for.
 		.PARAMETER UserToCopy
@@ -18,13 +18,14 @@ function Copy-UserLicense
 		.PARAMETER Credential
 			A credential object for a user with administrative permissions in Office 365.
 		.EXAMPLE
+			# Copy the SKUs and service plans from a template staff account to a new user account:
 			Copy-UserLicense -UserToLicense 'newstaffuser@domain.com' -UserToCopy 'standardstaffmember@domain.com' -Verbose
 		.EXAMPLE
 			# Get user accounts from Active Directory in an OU called student, that have been created in the last 1 day: 
 			$NewADUsers = Get-ADUser -Filter * -Properties WhenCreated | Where-Object { $_.DistinguishedName -match 'OU=Student' -and $_.WhenCreated -gt (Get-Date).AddDays(-1) }
-			
-			# Pass all userprincipalnames to the function to license them:
-			Copy-UserLicense -UserToLicense $NewADUsers.UserPrincipalName -UserToCopy 'standardstaffmember@domain.com' -Verbose
+
+			# Pass all userprincipalnames to the function to license them, copying the config of a template student:
+			Copy-UserLicense -UserToLicense $NewADUsers.UserPrincipalName -UserToCopy 'template-student@domain.com' -Verbose
 		.OUTPUTS
 			None
 	#>
@@ -36,14 +37,14 @@ function Copy-UserLicense
 		[String[]]
 		$UserToLicense,
 
-        [Parameter(Mandatory=$true)]
-        [string]
+		[Parameter(Mandatory=$true)]
+		[string]
 		$UserToCopy,
-		
+
 		[Parameter(Mandatory=$false)]
 		[System.Management.Automation.PSCredential]
-        [System.Management.Automation.Credential()]
-        $Credential
+		[System.Management.Automation.Credential()]
+		$Credential
     )
 
     Begin
@@ -91,88 +92,88 @@ function Copy-UserLicense
         {
             $UserWith = Get-AzureADUser -ObjectId $UserToCopy -ErrorAction Stop	
         }
-		catch 
+		catch
 		{
-            throw $_
-        }
+			throw $_
+		}
 
-        # Compare-Object -ReferenceObject $userwith.AssignedLicenses -DifferenceObject $userwithout.AssignedLicenses -Property SkuId -IncludeEqual
-        # if <= this means the userWith has a licence the userwithout doesn't.
-        # if => this means the user WITHOUT has a licence the reference user doesn't suggesting we remove it.
+		# Compare-Object -ReferenceObject $userwith.AssignedLicenses -DifferenceObject $userwithout.AssignedLicenses -Property SkuId -IncludeEqual
+		# if <= this means the userWith has a licence the userwithout doesn't.
+		# if => this means the user WITHOUT has a licence the reference user doesn't suggesting we remove it.
 
-        Write-Verbose -Message "Creating an AssignedLicenses object from $UserToCopy"
-        try
-        {            
-            # Define an Microsoft.Open.AzureAD.Model.AssignedLicenses object. Eventually this is passed to Set-AzureADUserLicense
-            $Licenses = New-Object -TypeName Microsoft.Open.AzureAD.Model.AssignedLicenses
-            
-            # Define an array to hold (potentially) mulitple instances of 'Microsoft.Open.AzureAD.Model.AssignedLicense'
-            $SkuArray = @()
+		Write-Verbose -Message "Creating an AssignedLicenses object from $UserToCopy"
+		try
+		{            
+			# Define an Microsoft.Open.AzureAD.Model.AssignedLicenses object. Eventually this is passed to Set-AzureADUserLicense
+			$Licenses = New-Object -TypeName Microsoft.Open.AzureAD.Model.AssignedLicenses
 
-            # For each Sku/license in the $UserWith:
-            foreach($Sku in $UserWith.AssignedLicenses)
-            {               
-                # Create a new License object:
-                $License = New-Object -TypeName Microsoft.Open.AzureAD.Model.AssignedLicense
-                # Add the SkuID and DisabledPlans to it:
-                $License.SkuId = $Sku.SkuId
-                $License.DisabledPlans = $Sku.DisabledPlans
+			# Define an array to hold (potentially) mulitple instances of 'Microsoft.Open.AzureAD.Model.AssignedLicense'
+			$SkuArray = @()
 
-                # Add to the $SkuArray (We can use $Licenses.AddLicense but this would overwrite each time)
-                $SkuArray += $License
+			# For each Sku/license in the $UserWith:
+			foreach($Sku in $UserWith.AssignedLicenses)
+			{               
+				# Create a new License object:
+				$License = New-Object -TypeName Microsoft.Open.AzureAD.Model.AssignedLicense
+				# Add the SkuID and DisabledPlans to it:
+				$License.SkuId = $Sku.SkuId
+				$License.DisabledPlans = $Sku.DisabledPlans
 
-                # Information:
-                $CurrentSku = ($skus | Where-Object { $_.Skuid -eq $Sku.SkuId })
-                Write-Verbose -Message "Adding $($CurrentSku.SkuPartNumber) license"
-                if($Sku.DisabledPlans)
-                {
-                    Write-Verbose -Message "  > Adding service plans to disabled array:"
-                    foreach($SkuID in $Sku.DisabledPlans)
-                    {
-                        $Disabled = $CurrentSku.ServicePlans | Where-Object { $_.ServicePlanId -eq $SkuId } | Select-Object -ExpandProperty ServicePlanName
-                        Write-Verbose -Message "    > $Disabled"
-                    }
-                }
+				# Add to the $SkuArray (We can use $Licenses.AddLicense but this would overwrite each time)
+				$SkuArray += $License
+
+				# Information:
+				$CurrentSku = ($skus | Where-Object { $_.Skuid -eq $Sku.SkuId })
+				Write-Verbose -Message "Adding $($CurrentSku.SkuPartNumber) license"
+				if($Sku.DisabledPlans)
+				{
+					Write-Verbose -Message "  > Adding service plans to disabled array:"
+					foreach($SkuID in $Sku.DisabledPlans)
+					{
+					$Disabled = $CurrentSku.ServicePlans | Where-Object { $_.ServicePlanId -eq $SkuId } | Select-Object -ExpandProperty ServicePlanName
+					Write-Verbose -Message "    > $Disabled"
+					}
+				}
 				else
 				{
-                    Write-Verbose -Message "  > No disabled service plans in this license"
-                }
-            }
+					Write-Verbose -Message "  > No disabled service plans in this license"
+				}
+			}
 
-            # Add the array of Microsoft.Open.AzureAD.Model.AssignedLicense to the Microsoft.Open.AzureAD.Model.AssignedLicenses object:
-            $Licenses.AddLicenses = $SkuArray
-        }
+			# Add the array of Microsoft.Open.AzureAD.Model.AssignedLicense to the Microsoft.Open.AzureAD.Model.AssignedLicenses object:
+			$Licenses.AddLicenses = $SkuArray
+		}
 		catch 
 		{
-            throw $_
-        }
-    }
+			throw $_
+		}
+	}
 	Process 
 	{
-        foreach($User in $UserToLicense)
-        {
-            Write-Verbose -Message "$($User): Getting User Object"
-            try 
-            {
-                $UserWithout = Get-AzureADUser -ObjectId $User -ErrorAction Stop	
-            }
+		foreach($User in $UserToLicense)
+		{
+			Write-Verbose -Message "$($User): Getting User Object"
+			try 
+			{
+				$UserWithout = Get-AzureADUser -ObjectId $User -ErrorAction Stop	
+			}
 			catch 
 			{
-                $_
-                continue
-            }         
-            
-            Write-Verbose -Message "$($User): Applying Licences"
+				$_
+				continue
+			}         
+
+			Write-Verbose -Message "$($User): Applying Licences"
 			try
 			{
-                Set-AzureADUserLicense -ObjectId $UserWithout.ObjectId -AssignedLicenses $Licenses -ErrorAction Stop
-            }
+				Set-AzureADUserLicense -ObjectId $UserWithout.ObjectId -AssignedLicenses $Licenses -ErrorAction Stop
+			}
 			catch 
 			{
-                $_
-                continue
-            }
-        }
+				$_
+				continue
+			}
+		}
     }
     End
     {
