@@ -159,7 +159,7 @@ function Copy-UserLicense
 			}
 			catch 
 			{
-				$_
+				Write-Error $_
 				continue
 			}         
 
@@ -170,7 +170,7 @@ function Copy-UserLicense
 			}
 			catch 
 			{
-				$_
+				Write-Error $_
 				continue
 			}
 		}

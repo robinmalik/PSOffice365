@@ -163,14 +163,11 @@ function Compare-LicensesAndServicePlans
 		{
 			try
 			{
-				$SkuData | Select-Object SkuPartNumber,ServicePlans,ServicePlanCount | Export-CSV $CSVFile -NoTypeInformation -Force
+				$SkuData | Select-Object SkuPartNumber,ServicePlans,ServicePlanCount | Export-CSV $CSVFile -NoTypeInformation -Force -ErrorAction Stop
 			}
 			catch
 			{
-				"Error was $_"
-				$line = $_.InvocationInfo.ScriptLineNumber
-				"Error was in Line $line"
-				
+				throw $_				
 			}
 		}
 	}
