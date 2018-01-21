@@ -163,7 +163,7 @@ function Compare-LicensesAndServicePlans
 		{
 			try
 			{
-				$SkuData | Select-Object SkuPartNumber,ServicePlans,ServicePlanCount | Export-CSV $CSVFile -NoTypeInformation -Force -ErrorAction Stop
+				$SkuData | Select-Object SkuPartNumber,ServicePlans,ServicePlanCount | Export-CSV $CSVFile -NoTypeInformation -Force -ErrorAction Stop -WhatIf:$WhatIfPreference
 			}
 			catch
 			{
